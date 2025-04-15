@@ -65,8 +65,9 @@ public class ObiSpawner : NetworkBehaviour
             attachment2.particleGroup = blueprint.groups[1];
 
 
-            
+            if (IsServer) {
             transform.SetParent(solver.transform);
+            }
         
 
     }

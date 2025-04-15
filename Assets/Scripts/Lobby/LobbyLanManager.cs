@@ -109,7 +109,8 @@ public class LobbyLanManager : NetworkBehaviour
 
         ShowStatus("Connecting...");
         loadingSpinner.SetActive(true);
-         StartCoroutine(HideConnectionAfterTimeout(5f));
+        StartCoroutine(HideConnectionAfterTimeout(5f));
+        connectedClientText.text = "Connected to: " + ipAddress;
     }
 
     void OnEnable()

@@ -45,8 +45,8 @@ public class CharacterSpawner : NetworkBehaviour
 
             // Set Nama Player
             CameraRefference _playerData = playerObject.GetComponent<CameraRefference>();
-            _playerData._nameTag.text = "Player " + clientId;
-            _playerData._backnameTag.text = "Player " + clientId;
+            // _playerData._nameTag.text = "Player " + clientId;
+            // _playerData._backnameTag.text = "Player " + clientId;
         }
 
         if (IsServer && player1 != null && player2 != null & player1.GetComponent<RigidbodyMover>().Grounded && player2.GetComponent<RigidbodyMover>().Grounded)

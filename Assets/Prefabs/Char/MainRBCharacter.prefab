@@ -266,7 +266,7 @@ CapsuleCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 403401717779338734}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 13400000, guid: c9c1b382bac500946839b2a3d5cea0c0, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -2406,6 +2406,7 @@ GameObject:
   - component: {fileID: 9100686800932283689}
   - component: {fileID: -868218734838560295}
   - component: {fileID: 1940340425173278494}
+  - component: {fileID: 688610431899473237}
   m_Layer: 15
   m_Name: MainRBCharacter
   m_TagString: Player
@@ -2446,7 +2447,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 4205165961
+  GlobalObjectIdHash: 883385021
   InScenePlacedSourceGlobalObjectIdHash: 4205165961
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -3175,7 +3176,7 @@ BoxCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6870741801256038630}
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 13400000, guid: c9c1b382bac500946839b2a3d5cea0c0, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -3222,6 +3223,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   Pause: 0
   _pauseEvent: {fileID: 11400000, guid: b9e7a6234fa565c44bb8a00e44e02dac, type: 2}
+--- !u!114 &688610431899473237
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6870741801256038630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 62359d80fdc0e4315ab6331b78ec5b90, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  kinematicForParticles: 0
 --- !u!1 &6932708351779642077
 GameObject:
   m_ObjectHideFlags: 0
