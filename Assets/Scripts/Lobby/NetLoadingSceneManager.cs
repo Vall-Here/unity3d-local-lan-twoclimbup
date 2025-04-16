@@ -16,9 +16,8 @@ public class NetLoadingSceneController : NetworkBehaviour
         StartCoroutine(LoadSceneAsync());
     }
 
-    private IEnumerator LoadSceneAsync()
+   private IEnumerator LoadSceneAsync()
     {
-        
         float elapsedTime = 0f;
         while (elapsedTime < loadDuration)
         {
@@ -29,7 +28,9 @@ public class NetLoadingSceneController : NetworkBehaviour
             yield return null;
         }
         
-        Loader.NetworkLoaderCallback();
+        loadingText.text = "Loading Complete!";
+        yield return new WaitForSeconds(1f);
+        Loader.NetworkLoaderCallback();         
     }
 
 }

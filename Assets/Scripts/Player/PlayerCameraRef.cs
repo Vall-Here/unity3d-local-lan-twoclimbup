@@ -17,7 +17,7 @@ public class CameraRefference : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        InitiateAfterObjectNetSpawn();
+        // InitiateAfterObjectNetSpawn();
         
     }
 

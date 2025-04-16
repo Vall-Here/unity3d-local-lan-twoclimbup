@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Mono.CSharp;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -16,31 +17,34 @@ public class GameMultiplayerManager : NetworkBehaviour
     public event EventHandler OnLocalGameUnpaused;
     public event EventHandler OnMultiplayerGamePaused;
     public event EventHandler OnMultiplayerGameUnpaused;
-
+    // public event EventHandler OnHostConnectionLost;
 
     private bool isLocalGamePaused = false;
     private bool isInitialized = false;
     private NetworkVariable<bool> isGamePaused = new NetworkVariable<bool>(false);
     private NetworkVariable<State> state = new NetworkVariable<State>(State.WaitingToStart);
+    private NetworkVariable<float> lastHeartbeatTime = new NetworkVariable<float>(0f);
 
     private Dictionary<ulong, bool> playerPausedDictionary;
     public NetworkVariable<ulong> pausedByPlayer = new NetworkVariable<ulong>(0);
     public List<ulong> connectedPlayers = new List<ulong>();
     private bool autoTestGamePausedState;
 
-
     [Header("Event bus")]
     [SerializeField] private GamePauseEvent _pauseEvent;
-    // [SerializeField] private TextMeshProUGUI pauseRequestText; 
-     [Header("Pause Timeout")]
-    [SerializeField] private float pauseTimeoutDuration = 60f; // Timeout dalam detik
+
+    [Header("Pause Timeout")]
+    [SerializeField] private float pauseTimeoutDuration = 60f;
     private float pauseTimeoutTimer;
     private bool isTimeoutActive;
 
-    [Header("Disconnect Settings")]
+    [Header("Connection Settings")]
+    [SerializeField] private float heartbeatInterval = 1f;
     [SerializeField] private float hostDisconnectCheckInterval = 2f;
     [SerializeField] private float maxWaitTimeForHostResponse = 5f;
     private Coroutine hostDisconnectCheckCoroutine;
+    private float lastPingTime;
+    private bool isWaitingForPingResponse;
 
 
     private enum State
@@ -64,17 +68,11 @@ public class GameMultiplayerManager : NetworkBehaviour
 
     void OnDisable()
     {
-           if (NetworkManager.Singleton == null) return;
+        if (NetworkManager.Singleton == null) return;
         _pauseEvent.OnPause -= GameInput_OnPauseAction;
-          NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+        NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
-        //  NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
-        // NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
-        // NetworkManager.Singleton.OnClientConnectedCallback -= NetworkManager_OnClientConnectedCallback;
-        // NetworkManager.Singleton.OnClientDisconnectCallback -= NetworkManager_Server_OnClientDisconnectCallback;
-        // NetworkManager.Singleton.OnClientDisconnectCallback -= NetworkManager_Client_OnClientDisconnectCallback;
-        // NetworkManager.Singleton.OnClientDisconnectCallback -= NetworkManager_OnClientDisconnectCallback;
-
+    
          if (hostDisconnectCheckCoroutine != null)
         {
             StopCoroutine(hostDisconnectCheckCoroutine);
@@ -86,24 +84,20 @@ public class GameMultiplayerManager : NetworkBehaviour
     {
         state.OnValueChanged += State_OnValueChanged;
         isGamePaused.OnValueChanged += IsGamePaused_OnValueChanged;
+        lastHeartbeatTime.OnValueChanged += OnHeartbeatUpdated;
 
         if (IsServer)
         {
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
-            // NetworkManager.Singleton.OnClientDisconnectCallback += NetworkManager_OnClientDisconnectCallback;
-            // NetworkManager.Singleton.OnClientConnectedCallback += NetworkManager_OnClientConnectedCallback;
-            // NetworkManager.Singleton.OnClientDisconnectCallback += NetworkManager_Server_OnClientDisconnectCallback;
-            // NetworkManager.Singleton.OnClientDisconnectCallback += NetworkManager_Client_OnClientDisconnectCallback;
-
             playerPausedDictionary[NetworkManager.Singleton.LocalClientId] = false;
+            StartCoroutine(ServerHeartbeatCoroutine());
         }
 
         isInitialized = true;
         InitializePlayerPauseStates();
-
         
-        if (!IsServer && IsClient) // Hanya untuk client
+        if (!IsServer && IsClient)
         {
             StartHostDisconnectChecker();
         }
@@ -121,6 +115,23 @@ public class GameMultiplayerManager : NetworkBehaviour
         }
     }
 
+    private void OnHeartbeatUpdated(float oldValue, float newValue)
+    {
+        if (!IsServer && newValue > lastPingTime)
+        {
+            isWaitingForPingResponse = false;
+        }
+    }
+
+    private IEnumerator ServerHeartbeatCoroutine()
+    {
+        while (IsServer)
+        {
+            lastHeartbeatTime.Value = Time.unscaledTime;
+            yield return new WaitForSeconds(heartbeatInterval);
+        }
+    }
+
  
     private void OnClientConnected(ulong clientId)
     {
@@ -134,7 +145,7 @@ public class GameMultiplayerManager : NetworkBehaviour
             connectedPlayers.Add(clientId);
             CheckPlayerLimit();
             
-            // Update player pause state
+    
             if (!playerPausedDictionary.ContainsKey(clientId))
             {
                 playerPausedDictionary[clientId] = false;
@@ -154,89 +165,99 @@ public class GameMultiplayerManager : NetworkBehaviour
     private IEnumerator HostDisconnectCheckRoutine()
     {
         var waitTime = new WaitForSecondsRealtime(hostDisconnectCheckInterval);
-        float timeSinceLastResponse = 0f;
+        float lastResponseTime = Time.unscaledTime;
 
         while (true)
         {
-            // Kirim ping ke host
+      
+            lastPingTime = Time.unscaledTime;
+            isWaitingForPingResponse = true;
             PingHostServerRpc();
 
             yield return waitTime;
-            timeSinceLastResponse += hostDisconnectCheckInterval;
 
-            // Jika host tidak merespon dalam waktu yang ditentukan
-            if (timeSinceLastResponse >= maxWaitTimeForHostResponse)
+            
+            if (isWaitingForPingResponse)
             {
-                Debug.LogError("Host not responding - assuming host has crashed");
-                HandleHostDisconnected();
-                yield break;
+                if (Time.unscaledTime - lastResponseTime >= maxWaitTimeForHostResponse)
+                {
+                    Debug.LogError("Host not responding - assuming host has crashed");
+                    HandleHostDisconnected();
+                    yield break;
+                }
             }
+            else
+            {
+                lastResponseTime = Time.unscaledTime;
+            }
+
+            CheckNetworkStability();
         }
     }
 
     [ServerRpc(RequireOwnership = false)]
     private void PingHostServerRpc(ServerRpcParams rpcParams = default)
     {
-        // Host akan otomatis menerima ini dan merespon
-        Debug.Log($"Ping received from client {rpcParams.Receive.SenderClientId}");
+        RespondToPingClientRpc(rpcParams.Receive.SenderClientId);
+    }
+
+    [ClientRpc]
+    private void ShowConnectionWarningClientRpc()
+    {
+   
+        Debug.Log("Warning: Connection to host is unstable");
+    }
+
+    [ClientRpc]
+    private void RespondToPingClientRpc(ulong clientId)
+    {
+        if (clientId == NetworkManager.Singleton.LocalClientId)
+        {
+            isWaitingForPingResponse = false;
+        }
     }
 
     private void HandleHostDisconnected()
     {
-        Debug.Log("Handling host disconnect on client");
-        StartCoroutine(ShutdownCoroutine());
-    
-    }
-
-
-
- private void OnClientDisconnected(ulong clientId)
-    {
-        Debug.Log($"Client {clientId} disconnected - Shutting down game");
-        
-        // Hentikan game dan kembali ke menu utama
-        ShutdownGame();
-    }
-
-
-    private void ShutdownGame()
-    {
-        if (!IsSpawned) return;
-        
-        Debug.Log("Initiating game shutdown due to player disconnect");
-        
-        // Hentikan semua state pause
-        isGamePaused.Value = false;
-        Time.timeScale = 1f;
-        
-        // Kirim RPC untuk shutdown ke semua client
-        ShutdownGameClientRpc();
-        
-        // Server juga shutdown
-        if (IsServer)
+        Debug.Log("Host disconnected - Forcing immediate shutdown");
+     
+        if (hostDisconnectCheckCoroutine != null)
         {
-            StartCoroutine(ShutdownCoroutine());
+            StopCoroutine(hostDisconnectCheckCoroutine);
         }
+        
+
+        ForceImmediateShutdown();
     }
 
-    [ClientRpc]
-    private void ShutdownGameClientRpc()
-    {
-        if (IsHost) return; // Host sudah menangani shutdown
-        
-        Debug.Log("Client received shutdown request");
-        StartCoroutine(ShutdownCoroutine());
-    }
 
-    private IEnumerator ShutdownCoroutine()
+    private void ForceImmediateShutdown()
     {
-        // Beri sedikit delay untuk memastikan semua network message diproses
-        yield return new WaitForSeconds(0.5f);
-        
-        // Kembali ke menu utama
-        NetworkManager.Singleton.Shutdown();
+
+        Time.timeScale = 1f;
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
         Loader.Load(Loader.Scene.LobbyScene);
     }
+
+
+
+
+    private void OnClientDisconnected(ulong clientId)
+    {
+    if (!IsServer && clientId == NetworkManager.ServerClientId)
+    {
+        Debug.Log($"Host {clientId} disconnected - Immediate shutdown");
+        ForceImmediateShutdown();
+    }
+     }
+
+
+    
+
+   
 
     private void CheckPlayerLimit()
     {
@@ -273,6 +294,8 @@ public class GameMultiplayerManager : NetworkBehaviour
         Time.timeScale = 1f;
         NetworkManager.Singleton.Shutdown();
         Loader.Load(Loader.Scene.LobbyScene);
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 
     [ClientRpc]
@@ -331,13 +354,11 @@ public class GameMultiplayerManager : NetworkBehaviour
             
             if (pauseTimeoutTimer <= 0f)
             {
-                // Force unpause jika timeout tercapai
                 ForceUnpauseGame();
             }
         }
     }
 
-    // Memaksa unpause game (dipanggil saat timeout atau edge cases)
     [ServerRpc]
     private void ForceUnpauseGameServerRpc()
     {
@@ -347,20 +368,13 @@ public class GameMultiplayerManager : NetworkBehaviour
     private void ForceUnpauseGame()
     {
         if (!IsServer) return;
-        
-        Debug.Log("Force unpausing game due to timeout or edge case");
-        
-        // Reset semua state pause
         foreach (var key in playerPausedDictionary.Keys)
         {
             playerPausedDictionary[key] = false;
         }
-        
         pausedByPlayer.Value = 0;
         UpdatePauseRequestClientRpc(0);
         StopPauseTimeout();
-        
-        // Set state game ke unpaused
         isGamePaused.Value = false;
     }
 
@@ -433,8 +447,7 @@ public class GameMultiplayerManager : NetworkBehaviour
             playerPausedDictionary[clientId] = true;
             pausedByPlayer.Value = clientId;
             UpdatePauseRequestClientRpc(clientId);
-            
-            // Mulai timeout hanya jika game belum paused
+
             if (!isGamePaused.Value)
             {
                 StartPauseTimeout();
@@ -453,14 +466,12 @@ public class GameMultiplayerManager : NetworkBehaviour
         {
             playerPausedDictionary[clientId] = false;
             
-            // Reset pausedByPlayer hanya jika pemain ini yang mempause
             if (pausedByPlayer.Value == clientId)
             {
                 pausedByPlayer.Value = 0;
                 UpdatePauseRequestClientRpc(0);
             }
             
-            // Hentikan timeout
             StopPauseTimeout();
             
             TestGamePausedState();
@@ -502,17 +513,13 @@ public class GameMultiplayerManager : NetworkBehaviour
     private void NetworkManager_Server_OnClientDisconnectCallback(ulong clientId)
     {
         Debug.Log($"Server: Client {clientId} disconnected, handling disconnect.");
-        
-        // Hapus dari dictionary
+
         playerPausedDictionary.Remove(clientId);
-        
-        // Jika pemain yang disconnect adalah yang mempause
+
         if (pausedByPlayer.Value == clientId)
         {
             pausedByPlayer.Value = 0;
             UpdatePauseRequestClientRpc(0);
-            
-            // Jika tidak ada pemain lain yang pause, unpause game
             bool anyOtherPlayerPaused = false;
             foreach (var kvp in playerPausedDictionary)
             {
@@ -527,16 +534,12 @@ public class GameMultiplayerManager : NetworkBehaviour
         }
         
         TestGamePausedState();
-        
-        // Jika host yang disconnect, berhenti
         if (clientId == NetworkManager.Singleton.LocalClientId)
         {
             Debug.Log("Host disconnected, shutting down");
             NetworkManager.Singleton.Shutdown();
             return;
         }
-        
-        // Jika hanya tersisa 1 pemain, pause game dan tampilkan pesan
         if (NetworkManager.Singleton.ConnectedClients.Count <= 1)
         {
             HandleSinglePlayerLeft();
@@ -546,17 +549,11 @@ public class GameMultiplayerManager : NetworkBehaviour
     private void HandleSinglePlayerLeft()
     {
         Debug.Log("Only one player left, pausing game");
-        
-        // Pause game dan set timeout lebih pendek
         isGamePaused.Value = true;
         pausedByPlayer.Value = NetworkManager.ServerClientId;
         UpdatePauseRequestClientRpc(NetworkManager.ServerClientId);
-        
-        // Set timeout khusus untuk kasus ini
         pauseTimeoutDuration = 10f;
         StartPauseTimeout();
-        
-        // Kirim notifikasi ke client
         NotifySinglePlayerLeftClientRpc();
     }
 
@@ -564,54 +561,55 @@ public class GameMultiplayerManager : NetworkBehaviour
     private void NotifySinglePlayerLeftClientRpc()
     {
         Debug.Log("Other players have left the game. Returning to lobby soon...");
-        // Anda bisa menampilkan UI khusus di sini
     }
 
 
-
-    // private void NetworkManager_OnClientConnectedCallback(ulong clientId)
-    // {
-    // }
-
-    // private void NetworkManager_Client_OnClientDisconnectCallback(ulong clientId)
-    // {
-    //     Debug.Log($"Client {clientId} disconnected, initiating scene change.");
-    //     Time.timeScale = 1f;
-    //     BackToMainMenuClientRpc();
-    // }
 
 //======================================= Heartbeat =============================================
 
 // Tambahkan di GameMultiplayerManager.cs
-[ServerRpc(RequireOwnership = false)]
-private void HeartbeatServerRpc(ServerRpcParams rpcParams = default)
-{
-    // Kosong, hanya untuk memastikan host masih hidup
-}
-
-private IEnumerator HostHeartbeatCheck()
-{
-    while (true)
+    [ServerRpc(RequireOwnership = false)]
+    private void HeartbeatServerRpc(ServerRpcParams rpcParams = default)
     {
-        yield return new WaitForSeconds(1f);
-        
-        if (!IsServer) continue;
-        
-        // Kirim heartbeat ke semua client
-        HeartbeatClientRpc();
     }
-}
 
-[ClientRpc]
-private void HeartbeatClientRpc()
-{
-    // Reset timer ketika menerima heartbeat dari host
-    if (hostDisconnectCheckCoroutine != null)
+    private IEnumerator HostHeartbeatCheck()
     {
-        StopCoroutine(hostDisconnectCheckCoroutine);
-        hostDisconnectCheckCoroutine = StartCoroutine(HostDisconnectCheckRoutine());
+        while (true)
+        {
+            yield return new WaitForSeconds(1f);
+            
+            if (!IsServer) continue;
+            
+            // Kirim heartbeat ke semua client
+            HeartbeatClientRpc();
+        }
     }
-}
+
+    [ClientRpc]
+    private void HeartbeatClientRpc()
+    {
+        // Reset timer ketika menerima heartbeat dari host
+        if (hostDisconnectCheckCoroutine != null)
+        {
+            StopCoroutine(hostDisconnectCheckCoroutine);
+            hostDisconnectCheckCoroutine = StartCoroutine(HostDisconnectCheckRoutine());
+        }
+    }
 
 
+
+    private void CheckNetworkStability()
+    {
+        if (!IsClient || !NetworkManager.Singleton.IsConnectedClient) return;
+        
+        var transport = NetworkManager.Singleton.NetworkConfig.NetworkTransport;
+        var rtt = transport.GetCurrentRtt(NetworkManager.ServerClientId); 
+        
+        if (rtt > 500) 
+        {
+            Debug.LogWarning($"High latency detected with host: {rtt}ms");
+            ShowConnectionWarningClientRpc();
+        }
+    }
 }

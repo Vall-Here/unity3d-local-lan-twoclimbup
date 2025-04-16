@@ -41,6 +41,8 @@ public class LobbyLanManager : NetworkBehaviour
     private void Awake()
     {
         _instance = this;
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
     public static LobbyLanManager Instance => _instance;
 
@@ -125,6 +127,25 @@ public class LobbyLanManager : NetworkBehaviour
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
             NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+        }
+    }
+
+    public override void OnDestroy()
+    {
+        
+        StopAllCoroutines();
+    }
+
+     public void CleanupNetworkManager()
+    {
+        if (NetworkManager.Singleton == null) return;
+
+        NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+        NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+
+        if (NetworkManager.Singleton.IsListening)
+        {
+            NetworkManager.Singleton.Shutdown();
         }
     }
 
@@ -252,5 +273,27 @@ public class LobbyLanManager : NetworkBehaviour
             ShowError("Connection timed out.");
             OnFailedToJoinGame?.Invoke(this, EventArgs.Empty); 
         }
+    }
+
+
+    private void CleanupResources()
+    {
+        // Cleanup network references
+        if (transport != null)
+        {
+            transport.DisconnectLocalClient();
+            transport = null;
+        }
+
+        // Cleanup UI references
+        hostButton.onClick.RemoveAllListeners();
+        joinButton.onClick.RemoveAllListeners();
+        stopButton.onClick.RemoveAllListeners();
+        cancelClientButton.onClick.RemoveAllListeners();
+        startButton.onClick.RemoveAllListeners();
+
+        // Cleanup events
+        OnTryingToJoinGame = null;
+        OnFailedToJoinGame = null;
     }
 }

@@ -30,7 +30,7 @@ public static class Loader {
     {
         Debug.Log("LoadNetwork");
         Loader.targetScene = targetScene;
-        NetworkManager.Singleton.SceneManager.LoadScene(Scene.NetLoadingScene.ToString(), LoadSceneMode.Single);
+        SceneManager.LoadScene(Scene.NetLoadingScene.ToString(), LoadSceneMode.Single);
     }
     
     public static void LoaderCallback()
@@ -46,3 +46,5 @@ public static class Loader {
     }
 
 }
+
+
