@@ -11,27 +11,56 @@ public class GamePauseUI : NetworkBehaviour
     [SerializeField] private Button mainMenuButton;
     [SerializeField] private Transform optionPanel;
     [SerializeField] private TextMeshProUGUI pauseRequestText;
+
+    [Header("Audio Settings")]
+    [SerializeField] private AudioSettingsSO audioSettings;
+    [SerializeField] private Slider volumeBacksoundSlider;
+    [SerializeField] private Slider volumeSFXSlider;
     private bool isReturningToMainMenu = false;
 
-    private void Awake()
+    private void Start()
     {
         resumeButton.onClick.AddListener(() =>
         {
             if (!isReturningToMainMenu) 
             {
-                Debug.Log("Resume button clicked.");
+                // Debug.Log("Resume button clicked.");
+                MainSceneAudioManager.Instance.PlayButtonClickSfx();
                 GameMultiplayerManager.Instance.TogglePauseGame();
             }
         });
 
         mainMenuButton.onClick.AddListener(() =>
         {
-            Debug.Log("Main Menu button clicked.");
+            MainSceneAudioManager.Instance.PlayButtonClickSfx();
+            // Debug.Log("Main Menu button clicked.");
             ReturnToMainMenu();
         });
+
+        volumeBacksoundSlider.onValueChanged.AddListener(ChangeVolumeBacksound);
+        volumeSFXSlider.onValueChanged.AddListener(ChangeVolumeSFX);
+
+
+         if(MainSceneAudioManager.Instance != null) {
+            MainSceneAudioManager.Instance.AudioSettingsChanged += UpdateAudioSettings;
+        }
+
     }
 
-    
+    void OnDisable()
+    {
+        if(MainSceneAudioManager.Instance != null) {
+            MainSceneAudioManager.Instance.AudioSettingsChanged -= UpdateAudioSettings;
+        }
+    }
+
+
+    private void UpdateAudioSettings(float volumeBacksound, float volumeSFX)
+    {
+        volumeBacksoundSlider.value = volumeBacksound;
+        volumeSFXSlider.value = volumeSFX;
+    }
+
 
     public override void OnNetworkSpawn()
     {
@@ -45,6 +74,7 @@ public class GamePauseUI : NetworkBehaviour
         {
             Debug.LogError("GameMultiplayerManager instance is not available.");
         }
+        UpdateAudioSettings(audioSettings.volumeBacksound, audioSettings.volumeSFX);
     }
 
     private void GameMultiplayerManager_OnMultiplayerGamePaused(object sender, System.EventArgs e)
@@ -62,6 +92,7 @@ public class GamePauseUI : NetworkBehaviour
 
     private void Show()
     {
+        MainSceneAudioManager.Instance.PlayOpenUISfx();
         Debug.Log("Showing pause menu.");
         optionPanel.gameObject.SetActive(true);
         UpdatePauseRequestText();
@@ -71,8 +102,7 @@ public class GamePauseUI : NetworkBehaviour
     private void Hide()
     {
         optionPanel.gameObject.SetActive(false);
-        // UpdatePauseRequestText();
-        
+        MainSceneAudioManager.Instance.PlayCloseUISfx();
     }
     private void UpdatePauseRequestText()
     {
@@ -84,6 +114,24 @@ public class GamePauseUI : NetworkBehaviour
         Debug.Log("Attempting to return to main menu.");
         isReturningToMainMenu = true;
         GameMultiplayerManager.Instance.BackToMainMenuServerRpc();
+    }
+
+
+
+    // ==================== Audio Settings ====================
+
+     private void ChangeVolumeBacksound(float value)
+    {
+        audioSettings.volumeBacksound = value;
+        MainSceneAudioManager.Instance.UpdateBacksoundVolume(value);
+        MainSceneAudioManager.Instance.SaveAudioSettings();
+    }
+
+    private void ChangeVolumeSFX(float value)
+    {
+        audioSettings.volumeSFX = value;
+        MainSceneAudioManager.Instance.UpdateSFXVolume(value);
+        MainSceneAudioManager.Instance.SaveAudioSettings();
     }
 
 

@@ -270,7 +270,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3578707934
+  GlobalObjectIdHash: 4013212896
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -290,7 +290,6 @@ GameObject:
   - component: {fileID: 4568238320489910814}
   - component: {fileID: 1215062002681289034}
   - component: {fileID: 4302935726200687732}
-  - component: {fileID: 4630829144179213400}
   m_Layer: 5
   m_Name: LobbyTag
   m_TagString: Untagged
@@ -357,17 +356,3 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &4630829144179213400
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8470282174748329595}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 258382192fffbe942aeb2e7bc3a98657, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _lobbyName: {fileID: 1651710933636489293}
-  _joinButton: {fileID: 224313211784516679}

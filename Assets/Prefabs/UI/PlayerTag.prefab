@@ -288,7 +288,6 @@ GameObject:
   - component: {fileID: 4568238320489910814}
   - component: {fileID: 1215062002681289034}
   - component: {fileID: 4302935726200687732}
-  - component: {fileID: 4691881534040011578}
   m_Layer: 5
   m_Name: PlayerTag
   m_TagString: Untagged
@@ -355,17 +354,3 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &4691881534040011578
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8470282174748329595}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee0a561f156ce4d4da027de2d1a03d96, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _playerNameText: {fileID: 1651710933636489293}
-  _kickButton: {fileID: 224313211784516679}
